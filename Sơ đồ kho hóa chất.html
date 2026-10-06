@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sơ đồ kho hóa chất</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f6f9;--fg:#1c2530;--mut:#5d6b7a;--card:#fff;--bd:#d3d9e1;--ac:#1f4e78;--l:80%;--gr:#d9dde3}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--fg:#e6eaf0;--mut:#9aa7b5;--card:#1b222b;--bd:#323b47;--ac:#6aa8e0;--l:34%;--gr:#3a424d}}
+:root[data-theme="dark"]{--bg:#12161c;--fg:#e6eaf0;--mut:#9aa7b5;--card:#1b222b;--bd:#323b47;--ac:#6aa8e0;--l:34%;--gr:#3a424d}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:4px 0 12px}h2{font-size:14px;margin:0 0 8px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px}
+.f{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:3px}
+input,button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--bd);border-radius:7px;padding:6px 8px}
+button{cursor:pointer}button.on,button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+#ex{width:280px;max-width:100%}
+.m{display:flex;flex-wrap:wrap;gap:10px}.m div{flex:1 1 220px;border:1px solid var(--bd);border-radius:8px;padding:8px}
+.m b{font-size:20px}.m span{color:var(--mut);font-size:12px;display:block}
+.pn{overflow-x:auto}.g{display:grid;grid-template-columns:48px repeat(6,minmax(78px,1fr));gap:4px;min-width:560px}
+.g>u{text-decoration:none;font-size:11px;color:var(--mut);display:flex;align-items:center;justify-content:center}
+.k{position:relative;min-height:58px;border-radius:6px;padding:4px 5px;font-size:11px;line-height:1.25;overflow:hidden;cursor:pointer;background:hsl(var(--h,0) 55% var(--l));border:1px solid transparent}
+.k.e{background:none;border:1px dashed var(--bd);cursor:default}.k.x{background:var(--gr)}
+.k b{display:block;font-weight:600}.k i{font-style:normal;color:var(--mut)}
+.k s{position:absolute;right:3px;top:3px;text-decoration:none;font-size:10px;background:var(--card);border-radius:8px;padding:0 5px;border:1px solid var(--bd)}
+.k.d{opacity:.2}
+.lg{display:flex;flex-wrap:wrap;gap:6px}.lg span{padding:2px 8px;border-radius:12px;font-size:12px;cursor:pointer;background:hsl(var(--h) 55% var(--l));border:2px solid transparent}.lg span.on{border-color:var(--fg)}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border-bottom:1px solid var(--bd);padding:4px 6px;text-align:left;white-space:nowrap}
+#info,#st{color:var(--mut);font-size:13px;min-height:18px}
+</style></head><body><main>
+<h1>Sơ đồ kho hóa chất – xếp kệ theo tồn hiện tại</h1>
+<div class="c"><div class="f">
+<label>File Excel theo dõi (PCP-WH-FORM-004)<input type="file" id="f" accept=".xlsx,.xlsm,.xls"></label>
+<label>Kho<input id="kho" value="DEP" size="5"></label>
+<label>Tính tần suất xuất từ<input type="date" id="d0" value="2026-01-01"></label>
+<label>đến<input type="date" id="d1"></label>
+<label>Mã loại khỏi kệ (TITEKOTE, hàng dễ cháy…)<input id="ex" value="QP03290,QM04291,QM05350,QM06517"></label>
+<button class="p" id="go">Tính lại</button></div>
+<div id="st">Chọn file Excel để xếp kệ. Dòng cột P không phải "Exported" được coi là tồn trong kho.</div></div>
+<div class="m" id="mt"></div>
+<div class="c" style="margin-top:12px"><div class="f" style="margin-bottom:8px"><h2 style="margin:0">Kệ 6 dãy × 3 hàng × 3 tầng</h2>
+<button id="b1" class="on">Đề xuất</button><button id="b0">Hiện tại</button></div>
+<div class="lg" id="lg" style="margin-bottom:10px"></div><div id="rk"></div><div id="info">Bấm vào một ô để xem chi tiết.</div></div>
+<div class="c"><h2>Pallet không đặt trong kệ</h2><div id="out">–</div></div>
+<div class="c"><h2>Thứ tự nhập kệ (hàng 3 trước, rồi hàng 2, hàng 1)</h2><div class="tw" id="mv">–</div></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),LN='ABCDEF';let rows=[],S=null,mode='new',hl=null;
+$('#d1').value=new Date().toISOString().slice(0,10);
+const nm=s=>String(s??'').replace(/\s+/g,' ').trim().toLowerCase(),ms=v=>v instanceof Date?v.getTime():typeof v==='number'?(v-25569)*864e5:v?Date.parse(v):NaN;
+const fd=t=>isNaN(t)||t>8e15?'?':new Date(t).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'2-digit'});
+function parse(wb){
+ const ws=wb.Sheets[wb.SheetNames.find(n=>/chemical/i.test(n))||wb.SheetNames[0]],a=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}),
+ hi=a.findIndex(r=>r.some(c=>nm(c)==='item number'));if(hi<0)throw Error('không thấy cột Item Number');
+ const h=a[hi].map(nm),col=(re,n=0)=>{let c=0;for(let i=0;i<h.length;i++)if(re.test(h[i])&&c++==n)return i;return -1},
+ C={item:col(/^item number/),desc:col(/^description/),lp:col(/license/),qty:col(/^quantity/),cont:col(/^cont/),oh:col(/on hand date/),exp:col(/e?xpiration date|epiration date/),st:col(/actual status/),iss:col(/date of issue/),loc:col(/^location/,0),pos:col(/^location/,1)};
+ return a.slice(hi+1).filter(r=>r[C.item]).map(r=>({item:String(r[C.item]).trim(),desc:String(r[C.desc]||'').trim(),lp:String(r[C.lp]||''),qty:+r[C.qty]||0,cont:String(r[C.cont]||'').trim(),oh:ms(r[C.oh]),exp:ms(r[C.exp]),x:nm(r[C.st])==='exported',iss:ms(r[C.iss]),loc:String(r[C.loc]||'').trim(),pos:String(r[C.pos]||'').trim()}));
+}
+function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function solve(P){
+ const lc=l=>{let t=0;for(let d=1;d<3;d++)for(const j of l[d]){let b=0;for(let e=0;e<d;e++)for(const k of l[e])if(P[k].it!==P[j].it||P[k].ex>P[j].ex)b++;t+=P[j].w*b}return t},
+ ok=s=>s.length<=3&&s.filter(j=>P[j].ibc).length<=1,CO=2;let best=null;
+ for(let sd=1;sd<=3;sd++){
+  const R=rng(sd*7919),l=[...Array(6)].map(()=>[[],[],[]]),pool=[];
+  [...P.keys()].sort((a,b)=>P[b].w-P[a].w).forEach(j=>{let ok1=0;for(let d=0;d<3&&!ok1;d++)for(let a=0;a<6&&!ok1;a++){const s=l[a][d];if(s.length<3&&!(P[j].ibc&&s.some(k=>P[k].ibc))){s.push(j);ok1=1}}if(!ok1)pool.push(j)});
+  let cur=l.reduce((t,x)=>t+lc(x),0)+CO*pool.reduce((t,j)=>t+P[j].w,0),bs=cur,bl=JSON.stringify([l,pool]);
+  for(let it=0,N=60000;it<N;it++){
+   const T=.05*(1-it/N)+1e-4;
+   if(R()<.6){
+    const a1=R()*6|0,d1=R()*3|0,a2=R()*6|0,d2=R()*3|0,s1=l[a1][d1],s2=l[a2][d2];
+    if(!s1.length||!s2.length||(a1==a2&&d1==d2))continue;
+    const x=R()*s1.length|0,y=R()*s2.length|0,o=lc(l[a1])+(a1!=a2?lc(l[a2]):0);
+    [s1[x],s2[y]]=[s2[y],s1[x]];
+    const n=ok(s1)&&ok(s2)?lc(l[a1])+(a1!=a2?lc(l[a2]):0):1e9,dl=n-o;
+    if(dl<=0||R()<Math.exp(-dl/T))cur+=dl;else[s1[x],s2[y]]=[s2[y],s1[x]];
+   }else if(pool.length){
+    const a=R()*6|0,d=R()*3|0,s=l[a][d];if(!s.length)continue;
+    const x=R()*s.length|0,p=R()*pool.length|0,o=lc(l[a])+CO*P[pool[p]].w;
+    [s[x],pool[p]]=[pool[p],s[x]];
+    const n=ok(s)?lc(l[a])+CO*P[pool[p]].w:1e9,dl=n-o;
+    if(dl<=0||R()<Math.exp(-dl/T))cur+=dl;else[s[x],pool[p]]=[pool[p],s[x]];
+   }
+   if(cur<bs-1e-9){bs=cur;bl=JSON.stringify([l,pool])}
+  }
+  if(!best||bs<best[0])best=[bs,bl];
+ }
+ const [lanes,pool]=JSON.parse(best[1]);return{lanes,pool};
+}
+const blk=(o,occ,a,d)=>{let b=0;for(let e=0;e<d-1;e++)for(const k of occ[a][e])if(k.it!==o.it||k.ex>o.ex)b++;return b};
+const mk=()=>Object.fromEntries([...LN].map(a=>[a,[[],[],[]]]));
+function run(){
+ if(!rows.length)return draw();
+ const exs=new Set($('#ex').value.split(/[,\s]+/).filter(Boolean)),kho=$('#kho').value.trim(),a=Date.parse($('#d0').value),b=Date.parse($('#d1').value)+864e5-1,W=(b-a)/864e5+1,rate={};
+ rows.forEach(r=>{if(r.x&&r.loc===kho&&r.iss>=a&&r.iss<=b)rate[r.item]=(rate[r.item]||0)+1/W});
+ const st=rows.filter(r=>!r.x&&r.loc===kho),cnt={};
+ st.forEach(r=>{r.elig=!exs.has(r.item);if(r.elig)cnt[r.item]=(cnt[r.item]||0)+1});
+ const P=st.filter(r=>r.elig);
+ P.forEach(r=>{r.it=r.item;r.ex=isNaN(r.exp)?9e15:r.exp;r.w=(rate[r.item]||0)/cnt[r.item]+4e-4;r.ibc=r.cont==='BOXCO'});
+ if(!P.length){$('#st').textContent='Không có pallet tồn ở kho "'+kho+'".';return}
+ $('#st').textContent='Đang tính…';
+ setTimeout(()=>{
+  const{lanes,pool}=solve(P),pl=new Map(),oN=mk(),oC=mk();
+  lanes.forEach((l,ai)=>l.forEach((s,d)=>{const t=[...s].sort((x,y)=>P[x].ex-P[y].ex),ib=t.filter(j=>P[j].ibc),rs=t.filter(j=>!P[j].ibc),lv=[1,2,3];
+   if(ib.length){pl.set(ib[0],{a:LN[ai],d:d+1,lv:1});lv.shift()}rs.forEach((j,i)=>pl.set(j,{a:LN[ai],d:d+1,lv:lv[i]}));t.forEach(j=>oN[LN[ai]][d].push(P[j]))}));
+  st.forEach(r=>{const m=/^([A-F])([1-3])-([1-3])$/.exec(r.pos);r.code=m?r.pos:'';if(m)oC[m[1]][+m[3]-1].push(r)});
+  const ms_=(list,occ,get)=>{let n=0,dn=0,z=0;list.forEach(o=>{const p=get(o);if(!p)return;const bb=blk(o,occ,p.a,p.d);o.b=bb;n+=o.w*bb;dn+=o.w;if(!bb)z+=o.w});return{c:list.filter(o=>get(o)).length,v:dn?n/dn:0,z:dn?z/dn:0}};
+  P.forEach((o,j)=>{const p=pl.get(j);o.nc=p?p.lv>0&&p.a+p.lv+'-'+p.d:''});
+  const mN=ms_(P,oN,o=>{const p=pl.get(P.indexOf(o));return p}),
+  mC=(P.forEach(o=>{o.bn=o.b}),ms_(P,oC,o=>{const m=/^([A-F])([1-3])-([1-3])$/.exec(o.pos);return m&&{a:m[1],d:+m[3]}}));
+  P.forEach(o=>{o.bc=o.b});P.forEach(o=>{o.b=o.bn});
+  const hue={};[...new Set(P.map(o=>o.item))].sort((x,y)=>(rate[y]||0)-(rate[x]||0)).forEach((it,i)=>hue[it]=(i*137.5)%360);
+  S={P,st,pl,pool,hue,mN,mC};$('#st').textContent='Đã xếp '+pl.size+' pallet vào kệ, '+pool.length+' pallet để ngoài. Bấm "Hiện tại" để so sánh.';draw();
+ },30);
+}
+function draw(){
+ const mp={};
+ if(S){if(mode==='new')S.pl.forEach((p,j)=>{const o=S.P[j];mp[p.a+p.d+p.lv]=[{o,b:o.bn,code:p.a+p.lv+'-'+p.d}]});
+  else S.st.forEach(r=>{if(r.code){const m=r.code,k=m[0]+m[3]+m[1];(mp[k]=mp[k]||[]).push({o:r,b:r.elig?r.bc:null,code:m})}})}
+ const T=['Hàng 1 – ngoài cùng (lấy thẳng)','Hàng 2 – phải dời hàng 1 của dãy','Hàng 3 – sát tường, dời hàng 1 và 2'];
+ $('#rk').innerHTML=[1,2,3].map(d=>`<h2>${T[d-1]}</h2><div class="pn"><div class="g"><u></u>${[...LN].map(a=>`<u>Dãy ${a}</u>`).join('')}${[3,2,1].map(lv=>`<u>Tầng ${lv}</u>`+[...LN].map(a=>{
+  const c=mp[a+d+lv];if(!c)return`<div class="k e"></div>`;const{o,b}=c[0],ex=S&&mode==='cur'&&!o.elig;
+  return`<div class="k${ex?' x':''}" data-i="${o.item}" data-c="${a}${lv}-${d}" style="--h:${S.hue[o.item]||0}"><b>${o.desc}${c.length>1?' +'+(c.length-1):''}</b><i>${Math.round(o.qty)} kg · ${fd(o.exp)}</i>${b!=null?`<s>${b}</s>`:''}</div>`}).join('')).join('')}</div></div>`).join('');
+ document.querySelectorAll('.k[data-c]').forEach(e=>{e.onclick=()=>{const c=(mp[e.dataset.c[0]+e.dataset.c[3]+e.dataset.c[1]]||[]).map(x=>`${x.o.desc} · LP ${x.o.lp} · ${Math.round(x.o.qty)} kg · HSD ${fd(x.o.exp)}`+(x.b!=null?' · phải dời '+x.b+' pallet':'')).join(' | ');$('#info').textContent=e.dataset.c+': '+c}});
+ if(hl)document.querySelectorAll('.k[data-i]').forEach(e=>e.classList.toggle('d',e.dataset.i!==hl));
+ if(!S)return;
+ const n={},t={};S.P.forEach(o=>{t[o.item]=(t[o.item]||0)+1});S.pl.forEach((p,j)=>{const i=S.P[j].item;n[i]=(n[i]||0)+1});
+ $('#lg').innerHTML=Object.keys(S.hue).map(i=>`<span class="${hl===i?'on':''}" data-i="${i}" style="--h:${S.hue[i]}">${S.P.find(o=>o.item===i).desc} ${n[i]||0}/${t[i]}</span>`).join('');
+ document.querySelectorAll('#lg span').forEach(e=>e.onclick=()=>{hl=hl===e.dataset.i?null:e.dataset.i;draw()});
+ const f=m=>`<b>${m.v.toFixed(2)}</b> pallet phải dời mỗi lần lấy<span>${Math.round(m.z*100)}% lần lấy không phải dời pallet nào · ${m.c} pallet đủ điều kiện trong kệ</span>`;
+ $('#mt').innerHTML=`<div>Hiện tại<br>${f(S.mC)}</div><div>Đề xuất<br>${f(S.mN)}</div>`;
+ const g={};S.pool.forEach(j=>{const o=S.P[j];(g[o.desc+'|hết chỗ (mã ít xuất hơn)']=g[o.desc+'|hết chỗ (mã ít xuất hơn)']||[]).push(o)});
+ S.st.filter(r=>!r.elig).forEach(o=>{(g[o.desc+'|loại theo cài đặt']=g[o.desc+'|loại theo cài đặt']||[]).push(o)});
+ $('#out').innerHTML='<table><tr><th>Hóa chất</th><th>Số pallet</th><th>Lý do</th></tr>'+Object.entries(g).map(([k,v])=>{const[a,b]=k.split('|');return`<tr><td>${a}</td><td>${v.length}</td><td>${b}</td></tr>`}).join('')+'</table>';
+ const ord=[...S.pl].sort((x,y)=>x[1].a.localeCompare(y[1].a)||y[1].d-x[1].d||y[1].lv-x[1].lv);
+ $('#mv').innerHTML='<table><tr><th>#</th><th>Ô mới</th><th>Hóa chất</th><th>License Plate</th><th>kg</th><th>HSD</th><th>Hiện tại</th><th>Việc</th></tr>'+ord.map(([j,p],i)=>{const o=S.P[j],c=p.a+p.lv+'-'+p.d;return`<tr><td>${i+1}</td><td><b>${c}</b></td><td>${o.desc}</td><td>${o.lp}</td><td>${Math.round(o.qty)}</td><td>${fd(o.exp)}</td><td>${o.pos||'–'}</td><td>${o.pos===c?'Giữ nguyên':'Dời'}</td></tr>`}).join('')+'</table>';
+}
+$('#f').onchange=e=>{const f=e.target.files[0];if(!f)return;$('#st').textContent='Đang đọc file…';f.arrayBuffer().then(b=>{try{rows=parse(XLSX.read(b,{cellDates:true}));run()}catch(x){$('#st').textContent='Không đọc được file: '+x.message}})};
+$('#go').onclick=run;
+$('#b1').onclick=()=>{mode='new';$('#b1').className='on';$('#b0').className='';draw()};
+$('#b0').onclick=()=>{mode='cur';$('#b0').className='on';$('#b1').className='';draw()};
+draw();
+</script></body></html>
